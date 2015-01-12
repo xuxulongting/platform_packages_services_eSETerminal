@@ -17,7 +17,7 @@
  * Contributed by: Giesecke & Devrient GmbH.
  */
 
-package org.simalliance.openmobileapi.terminal.service;
+package org.simalliance.openmobileapi.eseterminal;
 
 /**
  * Generic exception of the smartcard system.

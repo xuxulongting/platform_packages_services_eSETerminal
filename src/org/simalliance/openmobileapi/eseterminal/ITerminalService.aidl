@@ -17,10 +17,10 @@
  * Contributed by: Giesecke & Devrient GmbH.
  */
 
-package org.simalliance.openmobileapi.terminal.service;
+package org.simalliance.openmobileapi.eseterminal;
 
-import org.simalliance.openmobileapi.terminal.service.SmartcardError;
-import org.simalliance.openmobileapi.terminal.service.OpenLogicalChannelResponse;
+import org.simalliance.openmobileapi.eseterminal.SmartcardError;
+import org.simalliance.openmobileapi.eseterminal.OpenLogicalChannelResponse;
 
 /**
  * Smartcard service interface.

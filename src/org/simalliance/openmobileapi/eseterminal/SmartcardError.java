@@ -17,12 +17,12 @@
  * Contributed by: Giesecke & Devrient GmbH.
  */
 
-package org.simalliance.openmobileapi.terminal.service;
+package org.simalliance.openmobileapi.eseterminal;
 
 import android.os.Parcel;
 import android.os.Parcelable;
 
-import org.simalliance.openmobileapi.terminal.service.CardException;
+import org.simalliance.openmobileapi.eseterminal.CardException;
 
 import java.lang.reflect.Constructor;
 
@@ -35,13 +35,13 @@ public class SmartcardError implements Parcelable {
 
     private String mMessage;
 
-    public static final Creator<SmartcardError> CREATOR = new Creator<SmartcardError>() {
-        public SmartcardError createFromParcel(Parcel in) {
-            return new SmartcardError(in);
+    public static final Creator<org.simalliance.openmobileapi.eseterminal.SmartcardError> CREATOR = new Creator<org.simalliance.openmobileapi.eseterminal.SmartcardError>() {
+        public org.simalliance.openmobileapi.eseterminal.SmartcardError createFromParcel(Parcel in) {
+            return new org.simalliance.openmobileapi.eseterminal.SmartcardError(in);
         }
 
-        public SmartcardError[] newArray(int size) {
-            return new SmartcardError[size];
+        public org.simalliance.openmobileapi.eseterminal.SmartcardError[] newArray(int size) {
+            return new org.simalliance.openmobileapi.eseterminal.SmartcardError[size];
         }
     };
 
