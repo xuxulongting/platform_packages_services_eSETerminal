@@ -8,6 +8,9 @@
 
         <uses-library android:name="org.simalliance.openmobileapi" android:required="true" />
 
+        <uses-permission android:name="android.permission.NFC" />
+        <uses-permission android:name="com.android.nfc.permission.NFCEE_ADMIN" />
+
         <service android:name=".eSETerminal"
             android:enabled="true"
             android:exported="true"
