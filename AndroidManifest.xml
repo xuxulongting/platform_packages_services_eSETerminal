@@ -6,6 +6,8 @@
 
     <application android:label="eSETerminalService">
 
+        <uses-library android:name="org.simalliance.openmobileapi" android:required="true" />
+
         <service android:enabled="true"
                 android:exported="true"
          		android:name=".eSETerminal">
