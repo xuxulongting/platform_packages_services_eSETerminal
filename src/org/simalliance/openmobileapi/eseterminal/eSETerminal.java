@@ -349,5 +349,11 @@ public final class eSETerminal extends Service {
             }
             return rsp;
         }
+
+        @Override
+        public byte[] simIOExchange(int fileID, String filePath, byte[] cmd, org.simalliance.openmobileapi.service.SmartcardError error)
+                throws RemoteException {
+            throw new RemoteException("SIM IO error!");
+        }
     }
 }
