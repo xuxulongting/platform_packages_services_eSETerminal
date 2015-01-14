@@ -25,6 +25,8 @@ public final class eSETerminal extends Service {
 
     public static final String _eSE_TERMINAL = "eSE";
 
+    private final ITerminalService.Stub mTerminalBinder = new TerminalServiceImplementation();
+
     private INfcAdapterExtras ex;
 
     private Binder binder = new Binder();
@@ -38,8 +40,98 @@ public final class eSETerminal extends Service {
     public void onCreate() {
     }
 
-    private final ITerminalService.Stub mTerminalBinder = new ITerminalService.Stub() {
+    /**
+     * Creates a formatted exception message.
+     *
+     * @param commandName the name of the command. <code>null</code> if not
+     *            specified.
+     * @param sw the response status word.
+     * @return a formatted exception message.
+     */
+    static String createMessage(String commandName, int sw) {
+        StringBuffer message = new StringBuffer();
+        if (commandName != null) {
+            message.append(commandName).append(" ");
+        }
+        message.append("SW1/2 error: ");
+        message.append(Integer.toHexString(sw | 0x10000).substring(1));
+        return message.toString();
+    }
 
+    /**
+     * Creates a formatted exception message.
+     *
+     * @param commandName the name of the command. <code>null</code> if not
+     *            specified.
+     * @param message the message to be formatted.
+     * @return a formatted exception message.
+     */
+    static String createMessage(String commandName, String message) {
+        if (commandName == null) {
+            return message;
+        }
+        return commandName + " " + message;
+    }
+
+    /**
+     * Returns a concatenated response.
+     *
+     * @param r1 the first part of the response.
+     * @param r2 the second part of the response.
+     * @param length the number of bytes of the second part to be appended.
+     * @return a concatenated response.
+     */
+    static byte[] appendResponse(byte[] r1, byte[] r2, int length) {
+        byte[] rsp = new byte[r1.length + length];
+        System.arraycopy(r1, 0, rsp, 0, r1.length);
+        System.arraycopy(r2, 0, rsp, r1.length, length);
+        return rsp;
+    }
+
+    public static String getType() {
+        return _eSE_TERMINAL;
+    }
+    /*    @Override TODO
+    protected void internalConnect() throws CardException {
+        NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(mContext);
+        if(adapter == null) {
+            throw new CardException("Cannot get NFC Default Adapter");
+        }
+
+        ex = adapter.getNfcAdapterExtrasInterface();
+        if(ex == null)  {
+            throw new CardException("Cannot get NFC Extra interface");
+        }
+
+        try {
+            Bundle b = ex.open("org.simalliance.openmobileapi.service", binder);
+            if (b == null) {
+                throw new CardException("open SE failed");
+            }
+        } catch (Exception e) {
+            throw new CardException("open SE failed");
+        }
+        mDefaultApplicationSelectedOnBasicChannel = true;
+        mIsConnected = true;
+    }
+
+    @Override
+    protected void internalDisconnect() throws CardException {
+        try {
+            Bundle b = ex.close("org.simalliance.openmobileapi.service", binder);
+            if (b == null) {
+                throw new CardException("close SE failed");
+            }
+        } catch (Exception e) {
+            throw new CardException("close SE failed");
+        }
+    }
+    */
+
+    /**
+     * The Terminal service interface implementation.
+     */
+    final class TerminalServiceImplementation extends ITerminalService.Stub {
         @Override
         public String getType() {
             return eSETerminal.getType();
@@ -257,93 +349,5 @@ public final class eSETerminal extends Service {
             }
             return rsp;
         }
-    };
-
-    /**
-     * Creates a formatted exception message.
-     *
-     * @param commandName the name of the command. <code>null</code> if not
-     *            specified.
-     * @param sw the response status word.
-     * @return a formatted exception message.
-     */
-    static String createMessage(String commandName, int sw) {
-        StringBuffer message = new StringBuffer();
-        if (commandName != null) {
-            message.append(commandName).append(" ");
-        }
-        message.append("SW1/2 error: ");
-        message.append(Integer.toHexString(sw | 0x10000).substring(1));
-        return message.toString();
     }
-
-    /**
-     * Creates a formatted exception message.
-     *
-     * @param commandName the name of the command. <code>null</code> if not
-     *            specified.
-     * @param message the message to be formatted.
-     * @return a formatted exception message.
-     */
-    static String createMessage(String commandName, String message) {
-        if (commandName == null) {
-            return message;
-        }
-        return commandName + " " + message;
-    }
-
-    /**
-     * Returns a concatenated response.
-     *
-     * @param r1 the first part of the response.
-     * @param r2 the second part of the response.
-     * @param length the number of bytes of the second part to be appended.
-     * @return a concatenated response.
-     */
-    static byte[] appendResponse(byte[] r1, byte[] r2, int length) {
-        byte[] rsp = new byte[r1.length + length];
-        System.arraycopy(r1, 0, rsp, 0, r1.length);
-        System.arraycopy(r2, 0, rsp, r1.length, length);
-        return rsp;
-    }
-
-    public static String getType() {
-        return _eSE_TERMINAL;
-    }
-    /*    @Override TODO
-    protected void internalConnect() throws CardException {
-        NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(mContext);
-        if(adapter == null) {
-            throw new CardException("Cannot get NFC Default Adapter");
-        }
-
-        ex = adapter.getNfcAdapterExtrasInterface();
-        if(ex == null)  {
-            throw new CardException("Cannot get NFC Extra interface");
-        }
-
-        try {
-            Bundle b = ex.open("org.simalliance.openmobileapi.service", binder);
-            if (b == null) {
-                throw new CardException("open SE failed");
-            }
-        } catch (Exception e) {
-            throw new CardException("open SE failed");
-        }
-        mDefaultApplicationSelectedOnBasicChannel = true;
-        mIsConnected = true;
-    }
-
-    @Override
-    protected void internalDisconnect() throws CardException {
-        try {
-            Bundle b = ex.close("org.simalliance.openmobileapi.service", binder);
-            if (b == null) {
-                throw new CardException("close SE failed");
-            }
-        } catch (Exception e) {
-            throw new CardException("close SE failed");
-        }
-    }
-    */
 }
