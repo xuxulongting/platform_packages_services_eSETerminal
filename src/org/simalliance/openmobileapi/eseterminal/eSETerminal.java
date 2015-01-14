@@ -8,6 +8,8 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.util.Log;
+
 import java.util.MissingResourceException;
 import java.util.NoSuchElementException;
 
@@ -23,7 +25,7 @@ public final class eSETerminal extends Service {
 
     private static final String TAG = "eSETerminal";
 
-    public static final String _eSE_TERMINAL = "eSE";
+    public static final String eSE_TERMINAL = "eSE";
 
     private final ITerminalService.Stub mTerminalBinder = new TerminalServiceImplementation();
 
@@ -49,7 +51,7 @@ public final class eSETerminal extends Service {
      * @return a formatted exception message.
      */
     static String createMessage(String commandName, int sw) {
-        StringBuffer message = new StringBuffer();
+        StringBuilder message = new StringBuilder();
         if (commandName != null) {
             message.append(commandName).append(" ");
         }
@@ -89,7 +91,7 @@ public final class eSETerminal extends Service {
     }
 
     public static String getType() {
-        return _eSE_TERMINAL;
+        return eSE_TERMINAL;
     }
     /*    @Override TODO
     protected void internalConnect() throws CardException {
@@ -147,6 +149,7 @@ public final class eSETerminal extends Service {
             try {
                 rsp = transmit(manageChannelCommand, 2, 0x9000, 0, "MANAGE CHANNEL", error);
             } catch (org.simalliance.openmobileapi.service.CardException e) {
+                Log.e(TAG, "Error while transmitting", e);
                 throw new RemoteException();
             }
             if ((rsp.length == 2) && ((rsp[0] == (byte) 0x68) && (rsp[1] == (byte) 0x81))) {
@@ -179,6 +182,7 @@ public final class eSETerminal extends Service {
             try {
                 return new org.simalliance.openmobileapi.service.OpenLogicalChannelResponse(channelNumber, transmit(selectCommand, 2, 0x9000, 0xFFFF, "SELECT", error));
             } catch (org.simalliance.openmobileapi.service.CardException exp) {
+                Log.e(TAG, "Error while creating openLogicalChannel response", exp);
                 internalCloseLogicalChannel(channelNumber, error);
                 throw new NoSuchElementException(exp.getMessage());
             }
@@ -198,6 +202,7 @@ public final class eSETerminal extends Service {
                 try {
                     transmit(manageChannelClose, 2, 0x9000, 0xFFFF, "MANAGE CHANNEL", error);
                 } catch (org.simalliance.openmobileapi.service.CardException e) {
+                    Log.e(TAG, "Error while transmitting manage channel", e);
                     throw new RemoteException();
                 }
             }
@@ -212,6 +217,7 @@ public final class eSETerminal extends Service {
                 }
                 return b.getByteArray("out");
             } catch (Exception e) {
+                Log.e(TAG, "Error while transmit", e);
                 error.setError(org.simalliance.openmobileapi.service.CardException.class, "exchange APDU failed");
                 throw new RemoteException();
             }
@@ -231,6 +237,7 @@ public final class eSETerminal extends Service {
                 }
                 return adapter.isEnabled();
             } catch (Exception e) {
+                Log.e(TAG, "Error on NFCAdapter", e);
                 return false;
             }
         }
@@ -273,11 +280,9 @@ public final class eSETerminal extends Service {
                             createMessage(commandName, "transmit failed"), e);
                 }
             }
-            if (minRspLength > 0) {
-                if (rsp == null || rsp.length < minRspLength) {
-                    throw new org.simalliance.openmobileapi.service.CardException(
-                            createMessage(commandName, "response too small"));
-                }
+            if (minRspLength > 0 && (rsp == null || rsp.length < minRspLength)) {
+                throw new org.simalliance.openmobileapi.service.CardException(
+                        createMessage(commandName, "response too small"));
             }
             if (swMask != 0) {
                 if (rsp == null || rsp.length < 2) {
@@ -310,6 +315,7 @@ public final class eSETerminal extends Service {
             try {
                 rsp = internalTransmit(command, error);
             } catch (RemoteException e) {
+                Log.e(TAG, "Error while internal transmit", e);
                 throw new org.simalliance.openmobileapi.service.CardException(error.getMessage());
             }
 
@@ -321,6 +327,7 @@ public final class eSETerminal extends Service {
                     try {
                         rsp = internalTransmit(command, error);
                     } catch (RemoteException e) {
+                        Log.e(TAG, "Error while internal transmit", e);
                         throw new org.simalliance.openmobileapi.service.CardException(error.getMessage());
                     }
                 } else if (sw1 == 0x61) {
@@ -334,6 +341,7 @@ public final class eSETerminal extends Service {
                         try {
                             rsp = internalTransmit(getResponseCmd,error);
                         } catch (RemoteException e) {
+                            Log.e(TAG, "Error while internal transmit", e);
                             throw new CardException(error.getMessage());
                         }
                         if (rsp.length >= 2 && rsp[rsp.length - 2] == 0x61) {
