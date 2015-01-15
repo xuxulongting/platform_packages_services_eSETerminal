@@ -33,6 +33,8 @@ public final class eSETerminal extends Service {
 
     private Binder binder = new Binder();
 
+    private boolean mNFCAdapaterOpennedSuccesful = false;
+
     @Override
     public IBinder onBind(Intent intent) {
         return mTerminalBinder;
@@ -40,6 +42,38 @@ public final class eSETerminal extends Service {
 
     @Override
     public void onCreate() {
+        NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(this);
+        if(adapter == null) {
+            return;
+        }
+        ex = adapter.getNfcAdapterExtrasInterface();
+        if(ex == null)  {
+            return;
+        }
+        try {
+            Bundle b = ex.open("org.simalliance.openmobileapi.service", binder);
+            if (b == null) {
+                return;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error while opening nfc adapter", e);
+            return;
+        }
+        mNFCAdapaterOpennedSuccesful = true;
+    }
+
+    @Override
+    public void onDestroy() {
+        try {
+            Bundle b = ex.close("org.simalliance.openmobileapi.service", binder);
+            if (b == null) {
+                throw new CardException("close SE failed");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error while closing nfc adapter", e);
+        }
+        mNFCAdapaterOpennedSuccesful = false;
+        super.onDestroy();
     }
 
     /**
@@ -93,42 +127,6 @@ public final class eSETerminal extends Service {
     public static String getType() {
         return eSE_TERMINAL;
     }
-    /*    @Override TODO
-    protected void internalConnect() throws CardException {
-        NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(mContext);
-        if(adapter == null) {
-            throw new CardException("Cannot get NFC Default Adapter");
-        }
-
-        ex = adapter.getNfcAdapterExtrasInterface();
-        if(ex == null)  {
-            throw new CardException("Cannot get NFC Extra interface");
-        }
-
-        try {
-            Bundle b = ex.open("org.simalliance.openmobileapi.service", binder);
-            if (b == null) {
-                throw new CardException("open SE failed");
-            }
-        } catch (Exception e) {
-            throw new CardException("open SE failed");
-        }
-        mDefaultApplicationSelectedOnBasicChannel = true;
-        mIsConnected = true;
-    }
-
-    @Override
-    protected void internalDisconnect() throws CardException {
-        try {
-            Bundle b = ex.close("org.simalliance.openmobileapi.service", binder);
-            if (b == null) {
-                throw new CardException("close SE failed");
-            }
-        } catch (Exception e) {
-            throw new CardException("close SE failed");
-        }
-    }
-    */
 
     /**
      * The Terminal service interface implementation.
