@@ -25,7 +25,7 @@ public final class eSETerminal extends Service {
 
     private static final String TAG = "eSETerminal";
 
-    public static final String eSE_TERMINAL = "eSE";
+    public static final String ESE_TERMINAL = "eSE";
 
     private final ITerminalService.Stub mTerminalBinder = new TerminalServiceImplementation();
 
@@ -125,7 +125,7 @@ public final class eSETerminal extends Service {
     }
 
     public static String getType() {
-        return eSE_TERMINAL;
+        return ESE_TERMINAL;
     }
 
     /**
@@ -139,7 +139,14 @@ public final class eSETerminal extends Service {
 
 
         @Override
-        public org.simalliance.openmobileapi.service.OpenLogicalChannelResponse internalOpenLogicalChannel(byte[] aid, org.simalliance.openmobileapi.service.SmartcardError error) throws RemoteException {
+        public org.simalliance.openmobileapi.service.OpenLogicalChannelResponse
+        internalOpenLogicalChannel(byte[] aid,
+                                   org.simalliance.openmobileapi.service.SmartcardError error)
+                throws RemoteException {
+            if (!mNFCAdapaterOpennedSuccesful) {
+                error.setError(CardException.class, "open SE failed");
+                throw new RemoteException();
+            }
             byte[] manageChannelCommand = new byte[] {
                     0x00, 0x70, 0x00, 0x00, 0x01
             };
@@ -189,6 +196,10 @@ public final class eSETerminal extends Service {
         @Override
         public void internalCloseLogicalChannel(int channelNumber, org.simalliance.openmobileapi.service.SmartcardError error)
                 throws RemoteException {
+            if (!mNFCAdapaterOpennedSuccesful) {
+                error.setError(CardException.class, "open SE failed");
+                throw new RemoteException();
+            }
             if (channelNumber > 0) {
                 byte cla = (byte) channelNumber;
                 if (channelNumber > 3) {
@@ -208,6 +219,10 @@ public final class eSETerminal extends Service {
 
         @Override
         public byte[] internalTransmit(byte[] command, org.simalliance.openmobileapi.service.SmartcardError error) throws RemoteException {
+            if (!mNFCAdapaterOpennedSuccesful) {
+                error.setError(CardException.class, "open SE failed");
+                throw new RemoteException();
+            }
             try {
                 Bundle b = ex.transceive("org.simalliance.openmobileapi.service", command);
                 if (b == null) {
