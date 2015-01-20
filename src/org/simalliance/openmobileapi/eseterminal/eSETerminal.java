@@ -145,7 +145,7 @@ public final class eSETerminal extends Service {
                 throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
                 error.setError(CardException.class, "open SE failed");
-                throw new RemoteException();
+                return null;
             }
             byte[] manageChannelCommand = new byte[] {
                     0x00, 0x70, 0x00, 0x00, 0x01
@@ -155,20 +155,25 @@ public final class eSETerminal extends Service {
                 rsp = transmit(manageChannelCommand, 2, 0x9000, 0, "MANAGE CHANNEL", error);
             } catch (org.simalliance.openmobileapi.service.CardException e) {
                 Log.e(TAG, "Error while transmitting", e);
-                throw new RemoteException();
+                error.setError(CardException.class, e.getMessage());
+                return null;
             }
             if ((rsp.length == 2) && ((rsp[0] == (byte) 0x68) && (rsp[1] == (byte) 0x81))) {
-                throw new NoSuchElementException("logical channels not supported");
+                error.setError(NoSuchElementException.class, "logical channels not supported");
+                return null;
             }
             if (rsp.length == 2 && (rsp[0] == (byte) 0x6A && rsp[1] == (byte) 0x81)) {
-                throw new MissingResourceException("no free channel available", "", "");
+                error.setError(MissingResourceException.class, "no free channel available");
+                return null;
             }
             if (rsp.length != 3) {
-                throw new MissingResourceException("unsupported MANAGE CHANNEL response data", "", "");
+                error.setError(MissingResourceException.class, "unsupported MANAGE CHANNEL response data");
+                return null;
             }
             int channelNumber = rsp[0] & 0xFF;
             if (channelNumber == 0 || channelNumber > 19) {
-                throw new MissingResourceException("invalid logical channel number returned", "", "");
+                error.setError(MissingResourceException.class, "invalid logical channel number returned");
+                return null;
             }
 
             if (aid == null) {
@@ -189,7 +194,8 @@ public final class eSETerminal extends Service {
             } catch (org.simalliance.openmobileapi.service.CardException exp) {
                 Log.e(TAG, "Error while creating openLogicalChannel response", exp);
                 internalCloseLogicalChannel(channelNumber, error);
-                throw new NoSuchElementException(exp.getMessage());
+                error.setError(NoSuchElementException.class, exp.getMessage());
+                return null;
             }
         }
 
@@ -198,7 +204,7 @@ public final class eSETerminal extends Service {
                 throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
                 error.setError(CardException.class, "open SE failed");
-                throw new RemoteException();
+                return;
             }
             if (channelNumber > 0) {
                 byte cla = (byte) channelNumber;
@@ -212,7 +218,7 @@ public final class eSETerminal extends Service {
                     transmit(manageChannelClose, 2, 0x9000, 0xFFFF, "MANAGE CHANNEL", error);
                 } catch (org.simalliance.openmobileapi.service.CardException e) {
                     Log.e(TAG, "Error while transmitting manage channel", e);
-                    throw new RemoteException();
+                    error.setError(CardException.class, "open SE failed");
                 }
             }
         }
@@ -221,7 +227,7 @@ public final class eSETerminal extends Service {
         public byte[] internalTransmit(byte[] command, org.simalliance.openmobileapi.service.SmartcardError error) throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
                 error.setError(CardException.class, "open SE failed");
-                throw new RemoteException();
+                return null;
             }
             try {
                 Bundle b = ex.transceive("org.simalliance.openmobileapi.service", command);
@@ -229,10 +235,10 @@ public final class eSETerminal extends Service {
                     throw new org.simalliance.openmobileapi.service.CardException("exchange APDU failed");
                 }
                 return b.getByteArray("out");
-            } catch (Exception e) {
+            } catch (CardException e) {
                 Log.e(TAG, "Error while transmit", e);
-                error.setError(org.simalliance.openmobileapi.service.CardException.class, "exchange APDU failed");
-                throw new RemoteException();
+                error.setError(org.simalliance.openmobileapi.service.CardException.class, e.getMessage());
+                return null;
             }
         }
 
