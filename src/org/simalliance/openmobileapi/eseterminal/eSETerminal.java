@@ -227,7 +227,7 @@ public final class eSETerminal extends Service {
         public byte[] internalTransmit(byte[] command, org.simalliance.openmobileapi.service.SmartcardError error) throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
                 error.setError(CardException.class, "open SE failed");
-                return null;
+                return new byte[0];
             }
             try {
                 Bundle b = ex.transceive("org.simalliance.openmobileapi.service", command);
@@ -238,7 +238,7 @@ public final class eSETerminal extends Service {
             } catch (CardException e) {
                 Log.e(TAG, "Error while transmit", e);
                 error.setError(org.simalliance.openmobileapi.service.CardException.class, e.getMessage());
-                return null;
+                return new byte[0];
             }
         }
 
