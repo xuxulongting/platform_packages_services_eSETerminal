@@ -1,7 +1,10 @@
 package org.simalliance.openmobileapi.eseterminal;
 
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.nfc.INfcAdapterExtras;
 import android.nfc.NfcAdapter;
 import android.os.Binder;
@@ -27,11 +30,15 @@ public final class eSETerminal extends Service {
 
     public static final String ESE_TERMINAL = "eSE";
 
+    public static final String ESE_STATE_CHANGE_ACTION = "org.simalliance.openmobileapi.eSETerminal";
+
     private final ITerminalService.Stub mTerminalBinder = new TerminalServiceImplementation();
 
     private INfcAdapterExtras ex;
 
     private Binder binder = new Binder();
+
+    private BroadcastReceiver mNfcReceiver;
 
     private boolean mNFCAdapaterOpennedSuccesful = false;
 
@@ -42,6 +49,7 @@ public final class eSETerminal extends Service {
 
     @Override
     public void onCreate() {
+        registerAdapterStateChangedEvent(this);
         NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(this);
         if(adapter == null) {
             return;
@@ -73,6 +81,7 @@ public final class eSETerminal extends Service {
             Log.e(TAG, "Error while closing nfc adapter", e);
         }
         mNFCAdapaterOpennedSuccesful = false;
+        unregisterAdapterStateChangedEvent(getApplicationContext());
         super.onDestroy();
     }
 
@@ -126,6 +135,39 @@ public final class eSETerminal extends Service {
 
     public static String getType() {
         return ESE_TERMINAL;
+    }
+
+    private void registerAdapterStateChangedEvent(Context context) {
+        Log.v(TAG, "register ADAPTER_STATE_CHANGED event");
+
+        IntentFilter intentFilter = new IntentFilter(
+                "android.nfc.action.ADAPTER_STATE_CHANGED");
+        mNfcReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                final boolean nfcAdapterAction = intent.getAction().equals(
+                        "android.nfc.action.ADAPTER_STATE_CHANGED");
+                // Is NFC Adapter turned on?
+                final boolean nfcAdapterOn
+                        = nfcAdapterAction && intent.getIntExtra(
+                        "android.nfc.extra.ADAPTER_STATE", 1) == 3;
+                if (nfcAdapterOn) {
+                    Log.i(TAG, "NFC Adapter is ON. Checking access rules for"
+                            + " updates.");
+                    Intent i = new Intent(ESE_STATE_CHANGE_ACTION);
+                    sendBroadcast(i);
+                }
+            }
+        };
+        context.registerReceiver(mNfcReceiver, intentFilter);
+    }
+
+    private void unregisterAdapterStateChangedEvent(Context context) {
+        if (mNfcReceiver != null) {
+            Log.v(TAG, "unregister ADAPTER_STATE_CHANGED event");
+            context.unregisterReceiver(mNfcReceiver);
+            mNfcReceiver = null;
+        }
     }
 
     /**
@@ -381,6 +423,11 @@ public final class eSETerminal extends Service {
         public byte[] simIOExchange(int fileID, String filePath, byte[] cmd, org.simalliance.openmobileapi.service.SmartcardError error)
                 throws RemoteException {
             throw new RemoteException("SIM IO error!");
+        }
+
+        @Override
+        public String getSEChangeAction() {
+            return ESE_STATE_CHANGE_ACTION;
         }
     }
 }
