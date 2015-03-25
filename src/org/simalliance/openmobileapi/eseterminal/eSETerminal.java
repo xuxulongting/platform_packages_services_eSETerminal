@@ -13,11 +13,11 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
 
+
 import java.util.MissingResourceException;
 import java.util.NoSuchElementException;
 
 
-import org.simalliance.openmobileapi.service.CardException;
 import org.simalliance.openmobileapi.service.SmartcardError;
 import org.simalliance.openmobileapi.service.ITerminalService;
 
@@ -75,7 +75,7 @@ public final class eSETerminal extends Service {
         try {
             Bundle b = ex.close("org.simalliance.openmobileapi.service", binder);
             if (b == null) {
-                throw new CardException("close SE failed");
+                throw new RuntimeException("close SE failed");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error while closing nfc adapter", e);
@@ -186,18 +186,15 @@ public final class eSETerminal extends Service {
                                    org.simalliance.openmobileapi.service.SmartcardError error)
                 throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
-                error.setError(CardException.class, "open SE failed");
+                error.setError(RuntimeException.class, "open SE failed");
                 return null;
             }
             byte[] manageChannelCommand = new byte[] {
                     0x00, 0x70, 0x00, 0x00, 0x01
             };
             byte[] rsp = new byte[0];
-            try {
-                rsp = transmit(manageChannelCommand, 2, 0x9000, 0, "MANAGE CHANNEL", error);
-            } catch (org.simalliance.openmobileapi.service.CardException e) {
-                Log.e(TAG, "Error while transmitting", e);
-                error.setError(CardException.class, e.getMessage());
+            rsp = transmit(manageChannelCommand, 2, 0x9000, 0, "MANAGE CHANNEL", error);
+            if(error.createException() != null) {
                 return null;
             }
             if ((rsp.length == 2) && ((rsp[0] == (byte) 0x68) && (rsp[1] == (byte) 0x81))) {
@@ -230,22 +227,14 @@ public final class eSETerminal extends Service {
             selectCommand[1] = (byte) 0xA4;
             selectCommand[2] = 0x04;
             selectCommand[4] = (byte) aid.length;
-            System.arraycopy(aid, 0, selectCommand, 5, aid.length);
-            try {
-                return new org.simalliance.openmobileapi.service.OpenLogicalChannelResponse(channelNumber, transmit(selectCommand, 2, 0x9000, 0xFFFF, "SELECT", error));
-            } catch (org.simalliance.openmobileapi.service.CardException exp) {
-                Log.e(TAG, "Error while creating openLogicalChannel response", exp);
-                internalCloseLogicalChannel(channelNumber, error);
-                error.setError(NoSuchElementException.class, exp.getMessage());
-                return null;
-            }
+            return new org.simalliance.openmobileapi.service.OpenLogicalChannelResponse(channelNumber, transmit(selectCommand, 2, 0x9000, 0xFFFF, "SELECT", error));
         }
 
         @Override
         public void internalCloseLogicalChannel(int channelNumber, org.simalliance.openmobileapi.service.SmartcardError error)
                 throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
-                error.setError(CardException.class, "open SE failed");
+                error.setError(RuntimeException.class, "open SE failed");
                 return;
             }
             if (channelNumber > 0) {
@@ -256,32 +245,21 @@ public final class eSETerminal extends Service {
                 byte[] manageChannelClose = new byte[] {
                         cla, 0x70, (byte) 0x80, (byte) channelNumber
                 };
-                try {
-                    transmit(manageChannelClose, 2, 0x9000, 0xFFFF, "MANAGE CHANNEL", error);
-                } catch (org.simalliance.openmobileapi.service.CardException e) {
-                    Log.e(TAG, "Error while transmitting manage channel", e);
-                    error.setError(CardException.class, "open SE failed");
-                }
+                transmit(manageChannelClose, 2, 0x9000, 0xFFFF, "MANAGE CHANNEL", error);
             }
         }
 
         @Override
         public byte[] internalTransmit(byte[] command, org.simalliance.openmobileapi.service.SmartcardError error) throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
-                error.setError(CardException.class, "open SE failed");
+                error.setError(RuntimeException.class, "open SE failed");
                 return new byte[0];
             }
-            try {
-                Bundle b = ex.transceive("org.simalliance.openmobileapi.service", command);
-                if (b == null) {
-                    throw new org.simalliance.openmobileapi.service.CardException("exchange APDU failed");
-                }
-                return b.getByteArray("out");
-            } catch (CardException e) {
-                Log.e(TAG, "Error while transmit", e);
-                error.setError(org.simalliance.openmobileapi.service.CardException.class, e.getMessage());
-                return new byte[0];
+            Bundle b = ex.transceive("org.simalliance.openmobileapi.service", command);
+            if (b == null) {
+                error.setError(RuntimeException.class, "exchange APDU failed");
             }
+            return b.getByteArray("out");
         }
 
         @Override
@@ -294,7 +272,7 @@ public final class eSETerminal extends Service {
             try {
                 NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(eSETerminal.this);
                 if(adapter == null) {
-                    throw new org.simalliance.openmobileapi.service.CardException("Cannot get NFC Default Adapter");
+                    throw new RuntimeException("Cannot get NFC Default Adapter");
                 }
                 return adapter.isEnabled();
             } catch (Exception e) {
@@ -319,8 +297,6 @@ public final class eSETerminal extends Service {
          * @param commandName the name of the smart card command for logging
          *            purposes. May be <code>null</code>.
          * @return the response received.
-         * @throws org.simalliance.openmobileapi.service.CardException if the transmit operation or the minimum response
-         *             length check or the status word check failed.
          */
         public synchronized byte[] transmit(
                 byte[] cmd,
@@ -328,33 +304,34 @@ public final class eSETerminal extends Service {
                 int swExpected,
                 int swMask,
                 String commandName,
-                org.simalliance.openmobileapi.service.SmartcardError error)
-                throws org.simalliance.openmobileapi.service.CardException {
+                org.simalliance.openmobileapi.service.SmartcardError error) {
             byte[] rsp = null;
             try {
                 rsp = protocolTransmit(cmd, error);
             } catch (Exception e) {
                 if (commandName == null) {
-                    throw new org.simalliance.openmobileapi.service.CardException(e.getMessage());
+                    error.setError(RuntimeException.class, e.getMessage());
+                    return null;
                 } else {
-                    throw new org.simalliance.openmobileapi.service.CardException(
-                            createMessage(commandName, "transmit failed"), e);
+                    error.setError(RuntimeException.class, createMessage(commandName, "transmit failed"));
+                    return null;
                 }
             }
             if (minRspLength > 0 && (rsp == null || rsp.length < minRspLength)) {
-                throw new org.simalliance.openmobileapi.service.CardException(
-                        createMessage(commandName, "response too small"));
+                error.setError(RuntimeException.class, createMessage(commandName, "response too small"));
+                return null;
             }
             if (swMask != 0) {
                 if (rsp == null || rsp.length < 2) {
-                    throw new org.simalliance.openmobileapi.service.CardException(
-                            createMessage(commandName, "SW1/2 not available"));
+                    error.setError(RuntimeException.class, createMessage(commandName, "SW1/2 not available"));
+                    return null;
                 }
                 int sw1 = rsp[rsp.length - 2] & 0xFF;
                 int sw2 = rsp[rsp.length - 1] & 0xFF;
                 int sw = (sw1 << 8) | sw2;
                 if ((sw & swMask) != (swExpected & swMask)) {
-                    throw new org.simalliance.openmobileapi.service.CardException(createMessage(commandName, sw));
+                    error.setError(RuntimeException.class, createMessage(commandName, sw));
+                    return null;
                 }
             }
             return rsp;
@@ -367,30 +344,20 @@ public final class eSETerminal extends Service {
          *
          * @param cmd the command to be transmitted.
          * @return the response received.
-         * @throws org.simalliance.openmobileapi.service.CardException if the transmit operation failed.
          */
         protected synchronized byte[] protocolTransmit(byte[] cmd, SmartcardError error)
-                throws org.simalliance.openmobileapi.service.CardException {
+                throws RemoteException {
             byte[] command = cmd;
             byte[] rsp = null;
-            try {
-                rsp = internalTransmit(command, error);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error while internal transmit", e);
-                throw new org.simalliance.openmobileapi.service.CardException(error.getMessage());
-            }
+            rsp = internalTransmit(command, error);
+
 
             if (rsp.length >= 2) {
                 int sw1 = rsp[rsp.length - 2] & 0xFF;
                 int sw2 = rsp[rsp.length - 1] & 0xFF;
                 if (sw1 == 0x6C) {
                     command[cmd.length - 1] = rsp[rsp.length - 1];
-                    try {
-                        rsp = internalTransmit(command, error);
-                    } catch (RemoteException e) {
-                        Log.e(TAG, "Error while internal transmit", e);
-                        throw new org.simalliance.openmobileapi.service.CardException(error.getMessage());
-                    }
+                    rsp = internalTransmit(command, error);
                 } else if (sw1 == 0x61) {
                     byte[] getResponseCmd = new byte[] {
                             command[0], (byte) 0xC0, 0x00, 0x00, 0x00
@@ -399,12 +366,7 @@ public final class eSETerminal extends Service {
                     System.arraycopy(rsp, 0, response, 0, rsp.length - 2);
                     while (true) {
                         getResponseCmd[4] = rsp[rsp.length - 1];
-                        try {
-                            rsp = internalTransmit(getResponseCmd,error);
-                        } catch (RemoteException e) {
-                            Log.e(TAG, "Error while internal transmit", e);
-                            throw new CardException(error.getMessage());
-                        }
+                        rsp = internalTransmit(getResponseCmd,error);
                         if (rsp.length >= 2 && rsp[rsp.length - 2] == 0x61) {
                             response = appendResponse(
                                     response, rsp, rsp.length - 2);
