@@ -75,9 +75,9 @@ public final class eSETerminal extends Service {
         try {
             Bundle b = ex.close("org.simalliance.openmobileapi.service", binder);
             if (b == null) {
-                throw new RuntimeException("close SE failed");
+                Log.e(TAG, "Close SE failed");
             }
-        } catch (Exception e) {
+        } catch (RemoteException e) {
             Log.e(TAG, "Error while closing nfc adapter", e);
         }
         mNFCAdapaterOpennedSuccesful = false;
@@ -145,8 +145,8 @@ public final class eSETerminal extends Service {
         mNfcReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                final boolean nfcAdapterAction = intent.getAction().equals(
-                        "android.nfc.action.ADAPTER_STATE_CHANGED");
+                final boolean nfcAdapterAction = "android.nfc.action.ADAPTER_STATE_CHANGED".equals(
+                        intent.getAction());
                 // Is NFC Adapter turned on?
                 final boolean nfcAdapterOn
                         = nfcAdapterAction && intent.getIntExtra(
@@ -269,16 +269,12 @@ public final class eSETerminal extends Service {
 
         @Override
         public boolean isCardPresent() throws RemoteException {
-            try {
-                NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(eSETerminal.this);
-                if(adapter == null) {
-                    throw new RuntimeException("Cannot get NFC Default Adapter");
-                }
-                return adapter.isEnabled();
-            } catch (Exception e) {
-                Log.e(TAG, "Error on NFCAdapter", e);
+            NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(eSETerminal.this);
+            if(adapter == null) {
+                Log.e(TAG, "Cannot get NFC Default Adapter");
                 return false;
             }
+            return adapter.isEnabled();
         }
 
         /**
@@ -309,6 +305,7 @@ public final class eSETerminal extends Service {
             try {
                 rsp = protocolTransmit(cmd, error);
             } catch (Exception e) {
+                Log.e(TAG, "Exception: ", e);
                 if (commandName == null) {
                     error.setError(RuntimeException.class, e.getMessage());
                     return null;
@@ -354,7 +351,6 @@ public final class eSETerminal extends Service {
 
             if (rsp.length >= 2) {
                 int sw1 = rsp[rsp.length - 2] & 0xFF;
-                int sw2 = rsp[rsp.length - 1] & 0xFF;
                 if (sw1 == 0x6C) {
                     command[cmd.length - 1] = rsp[rsp.length - 1];
                     rsp = internalTransmit(command, error);
