@@ -21,6 +21,7 @@ import java.util.NoSuchElementException;
 
 import org.simalliance.openmobileapi.service.SmartcardError;
 import org.simalliance.openmobileapi.service.ITerminalService;
+import org.simalliance.openmobileapi.service.OpenLogicalChannelResponse;
 
 /**
  * Created by sevilser on 18/12/14.
@@ -182,9 +183,9 @@ public final class eSETerminal extends Service {
 
 
         @Override
-        public org.simalliance.openmobileapi.service.OpenLogicalChannelResponse
+        public OpenLogicalChannelResponse
         internalOpenLogicalChannel(byte[] aid,
-                                   org.simalliance.openmobileapi.service.SmartcardError error)
+                                   SmartcardError error)
                 throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
                 error.setError(RuntimeException.class, "open SE failed");
@@ -217,7 +218,7 @@ public final class eSETerminal extends Service {
             }
 
             if (aid == null) {
-                return new org.simalliance.openmobileapi.service.OpenLogicalChannelResponse(channelNumber, null);
+                return new OpenLogicalChannelResponse(channelNumber, null);
             }
 
             byte[] selectCommand = new byte[aid.length + 6];
@@ -228,11 +229,11 @@ public final class eSETerminal extends Service {
             selectCommand[1] = (byte) 0xA4;
             selectCommand[2] = 0x04;
             selectCommand[4] = (byte) aid.length;
-            return new org.simalliance.openmobileapi.service.OpenLogicalChannelResponse(channelNumber, transmit(selectCommand, 2, 0x9000, 0xFFFF, "SELECT", error));
+            return new OpenLogicalChannelResponse(channelNumber, transmit(selectCommand, 2, 0x9000, 0xFFFF, "SELECT", error));
         }
 
         @Override
-        public void internalCloseLogicalChannel(int channelNumber, org.simalliance.openmobileapi.service.SmartcardError error)
+        public void internalCloseLogicalChannel(int channelNumber, SmartcardError error)
                 throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
                 error.setError(RuntimeException.class, "open SE failed");
@@ -251,7 +252,7 @@ public final class eSETerminal extends Service {
         }
 
         @Override
-        public byte[] internalTransmit(byte[] command, org.simalliance.openmobileapi.service.SmartcardError error) throws RemoteException {
+        public byte[] internalTransmit(byte[] command, SmartcardError error) throws RemoteException {
             if (!mNFCAdapaterOpennedSuccesful) {
                 error.setError(RuntimeException.class, "open SE failed");
                 return new byte[0];
@@ -301,7 +302,7 @@ public final class eSETerminal extends Service {
                 int swExpected,
                 int swMask,
                 String commandName,
-                org.simalliance.openmobileapi.service.SmartcardError error) {
+                SmartcardError error) {
             byte[] rsp = null;
             try {
                 rsp = protocolTransmit(cmd, error);
@@ -379,7 +380,7 @@ public final class eSETerminal extends Service {
         }
 
         @Override
-        public byte[] simIOExchange(int fileID, String filePath, byte[] cmd, org.simalliance.openmobileapi.service.SmartcardError error)
+        public byte[] simIOExchange(int fileID, String filePath, byte[] cmd, SmartcardError error)
                 throws RemoteException {
             throw new RemoteException("SIM IO error!");
         }
