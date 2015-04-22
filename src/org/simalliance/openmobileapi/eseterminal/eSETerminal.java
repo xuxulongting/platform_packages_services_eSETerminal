@@ -143,6 +143,7 @@ public final class eSETerminal extends Service {
         @Override
         public OpenLogicalChannelResponse internalOpenLogicalChannel(
                 byte[] aid,
+                byte p2,
                 SmartcardError error) throws RemoteException {
             try {
                 if (!mNFCAdapaterOpennedSuccesful) {
@@ -175,6 +176,7 @@ public final class eSETerminal extends Service {
                     }
                     selectCommand[1] = (byte) 0xA4;
                     selectCommand[2] = 0x04;
+                    selectCommand[3] = p2;
                     selectCommand[4] = (byte) aid.length;
                     System.arraycopy(aid, 0, selectCommand, 5, aid.length);
                     try {
