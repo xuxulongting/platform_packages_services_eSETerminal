@@ -46,7 +46,7 @@ public final class eSETerminal extends Service {
 
     @Override
     public void onCreate() {
-        registerAdapterStateChangedEvent(this);
+        registerAdapterStateChangedEvent();
         NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(this);
         if(adapter == null) {
             return;
@@ -56,7 +56,7 @@ public final class eSETerminal extends Service {
             return;
         }
         try {
-            Bundle b = ex.open("org.simalliance.openmobileapi.service", binder);
+            Bundle b = ex.open("org.simalliance.openmobileapi.eseterminal", binder);
             if (b == null) {
                 return;
             }
@@ -69,16 +69,18 @@ public final class eSETerminal extends Service {
 
     @Override
     public void onDestroy() {
-        try {
-            Bundle b = ex.close("org.simalliance.openmobileapi.service", binder);
-            if (b == null) {
-                Log.e(TAG, "Close SE failed");
+        if (ex != null) {
+            try {
+                Bundle b = ex.close("org.simalliance.openmobileapi.eseterminal", binder);
+                if (b == null) {
+                    Log.e(TAG, "Close SE failed");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error while closing nfc adapter", e);
             }
-        } catch (RemoteException e) {
-            Log.e(TAG, "Error while closing nfc adapter", e);
         }
         mNFCAdapaterOpennedSuccesful = false;
-        unregisterAdapterStateChangedEvent(getApplicationContext());
+        unregisterAdapterStateChangedEvent();
         super.onDestroy();
     }
 
@@ -90,14 +92,14 @@ public final class eSETerminal extends Service {
         if (!mNFCAdapaterOpennedSuccesful) {
             throw new IllegalStateException("Open SE failed");
         }
-        Bundle b = ex.transceive("org.simalliance.openmobileapi.service", cmd);
+        Bundle b = ex.transceive("org.simalliance.openmobileapi.eseterminal", cmd);
         if (b == null) {
             throw new IOException ("Exchange APDU failed");
         }
         return b.getByteArray("out");
     }
 
-    private void registerAdapterStateChangedEvent(Context context) {
+    private void registerAdapterStateChangedEvent() {
         Log.v(TAG, "register ADAPTER_STATE_CHANGED event");
 
         IntentFilter intentFilter = new IntentFilter(
@@ -119,13 +121,13 @@ public final class eSETerminal extends Service {
                 }
             }
         };
-        context.registerReceiver(mNfcReceiver, intentFilter);
+        registerReceiver(mNfcReceiver, intentFilter);
     }
 
-    private void unregisterAdapterStateChangedEvent(Context context) {
+    private void unregisterAdapterStateChangedEvent() {
         if (mNfcReceiver != null) {
             Log.v(TAG, "unregister ADAPTER_STATE_CHANGED event");
-            context.unregisterReceiver(mNfcReceiver);
+            unregisterReceiver(mNfcReceiver);
             mNfcReceiver = null;
         }
     }
