@@ -54,6 +54,10 @@ public final class eSETerminal extends Service {
     @Override
     public void onCreate() {
         registerAdapterStateChangedEvent();
+        init();
+    }
+
+    private void init() {
         NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(this);
         if(adapter == null) {
             return;
@@ -239,7 +243,11 @@ public final class eSETerminal extends Service {
                 throws RemoteException {
             try {
                 if (!isCardPresent()) {
-                    throw new IOException("open SE failed");
+                    // Try to initialize it again
+                    init();
+                    if (!isCardPresent()) {
+                        throw new IOException("open SE failed");
+                    }
                 }
                 if (channelNumber > 0) {
                     CommandApdu manageChannelClose = new CommandApdu(
