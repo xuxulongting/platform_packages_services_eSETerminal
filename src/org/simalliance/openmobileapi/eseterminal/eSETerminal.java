@@ -115,19 +115,19 @@ public final class eSETerminal extends Service {
     }
 
     private byte[] protocolTransmit(byte[] cmd) throws Exception {
-        CommandApdu cmdApdu = new CommandApdu(cmd);
         byte[] response = transmit(cmd);
         ResponseApdu responseApdu = new ResponseApdu(response);
         if (responseApdu.getSw1Value() == 0x61) {
+            int channelNumber = getChannelNumber(cmd[0]);
             CommandApdu getResponseCmd = new CommandApdu(
-                    ISO7816.CLA_INTERINDUSTRY,
+                    formClaByte(ISO7816.CLA_INTERINDUSTRY, channelNumber),
                     ISO7816.INS_GET_RESPONSE,
                     (byte) 0x00,
                     (byte) 0x00,
                     (byte) responseApdu.getSw2Value());
             response = transmit(getResponseCmd.toByteArray());
         } else if (responseApdu.getSw1Value() == 0x6C) {
-            cmdApdu = cmdApdu.cloneWithLe(responseApdu.getSw2Value());
+            CommandApdu cmdApdu = new CommandApdu(cmd).cloneWithLe(responseApdu.getSw2Value());
             response = transmit(cmdApdu.toByteArray());
         }
         return response;
@@ -176,6 +176,26 @@ public final class eSETerminal extends Service {
         }
         return mNfcExtras != null;
     }
+
+    private byte formClaByte(byte baseCla, int channelNumber) {
+        if (channelNumber < 4) {
+            baseCla &= 0b11111100;
+            baseCla |= channelNumber;
+        } else {
+            baseCla &= 0b11110000;
+            baseCla |= (0x40 | (channelNumber - 4));
+        }
+        return baseCla;
+    }
+
+    private int getChannelNumber(byte cla) {
+        if ((cla & 0x40) == 0x00) {
+            return cla & 0b00000011;
+        } else {
+            return (cla & 0b00000011) + 4;
+        }
+    }
+
     /**
      * The Terminal service interface implementation.
      */
@@ -235,12 +255,7 @@ public final class eSETerminal extends Service {
 
                 byte[] selectResponse = null;
                 if (aid != null) {
-                    byte cla = ISO7816.CLA_INTERINDUSTRY;
-                    if (channelNumber < 4) {
-                        cla |= channelNumber;
-                    } else {
-                        cla |= (0x40 | (channelNumber - 4));
-                    }
+                    byte cla = formClaByte(ISO7816.CLA_INTERINDUSTRY, channelNumber);
                     CommandApdu selectCommand = new CommandApdu(
                             cla,
                             ISO7816.INS_SELECT,
