@@ -170,6 +170,10 @@ public final class eSETerminal extends Service {
     }
 
     private boolean isCardPresent() {
+        if (mNfcExtras != null) {
+            // Try to initialize it again
+            init();
+        }
         return mNfcExtras != null;
     }
     /**
@@ -279,11 +283,7 @@ public final class eSETerminal extends Service {
                 throws RemoteException {
             try {
                 if (!isCardPresent()) {
-                    // Try to initialize it again
-                    init();
-                    if (!isCardPresent()) {
-                        throw new IOException("open SE failed");
-                    }
+                    throw new IOException("open SE failed");
                 }
                 if (channelNumber > 0) {
                     CommandApdu manageChannelClose = new CommandApdu(
