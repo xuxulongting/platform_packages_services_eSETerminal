@@ -124,7 +124,7 @@ public final class eSETerminal extends Service {
                     ISO7816.INS_GET_RESPONSE,
                     (byte) 0x00,
                     (byte) 0x00,
-                    (byte) responseApdu.getSw2Value());
+                    responseApdu.getSw2Value());
             response = transmit(getResponseCmd.toByteArray());
         } else if (responseApdu.getSw1Value() == 0x6C) {
             CommandApdu cmdApdu = new CommandApdu(cmd).cloneWithLe(responseApdu.getSw2Value());
