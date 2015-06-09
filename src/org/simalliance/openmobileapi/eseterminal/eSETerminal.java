@@ -17,9 +17,13 @@ import java.io.IOException;
 
 import java.util.NoSuchElementException;
 
+import org.simalliance.openmobileapi.internal.ByteArrayConverter;
 import org.simalliance.openmobileapi.service.OpenLogicalChannelResponse;
 import org.simalliance.openmobileapi.service.SmartcardError;
 import org.simalliance.openmobileapi.service.ITerminalService;
+import org.simalliance.openmobileapi.util.CommandApdu;
+import org.simalliance.openmobileapi.util.ISO7816;
+import org.simalliance.openmobileapi.util.ResponseApdu;
 
 public final class eSETerminal extends Service {
 
@@ -27,21 +31,24 @@ public final class eSETerminal extends Service {
 
     public static final String ESE_TERMINAL = "eSE";
 
-    public static final String ACTION_ESE_STATE_CHANGED = "org.simalliance.openmobileapi.action.ESE_STATE_CHANGED";
+    private static final String ACTION_ESE_STATE_CHANGED = "org.simalliance.openmobileapi.action.ESE_STATE_CHANGED";
+    private static final String PKG_NAME = "org.simalliance.openmobileapi.eseterminal";
 
-    private final ITerminalService.Stub mTerminalBinder = new TerminalServiceImplementation();
+    /**
+     * Used for communicating with NFC Execution Environment (eSE).
+     */
+    private INfcAdapterExtras mNfcExtras;
 
-    private INfcAdapterExtras ex;
-
-    private Binder binder = new Binder();
+    /**
+     * Used for communicating with NFC extras.
+     */
+    private Binder mBinder = new Binder();
 
     private BroadcastReceiver mNfcReceiver;
 
-    private boolean mNFCAdapaterOpennedSuccesful = false;
-
     @Override
     public IBinder onBind(Intent intent) {
-        return mTerminalBinder;
+        return new TerminalServiceImplementation();
     }
 
     @Override
@@ -51,35 +58,36 @@ public final class eSETerminal extends Service {
         if(adapter == null) {
             return;
         }
-        ex = adapter.getNfcAdapterExtrasInterface();
-        if(ex == null)  {
+        mNfcExtras = adapter.getNfcAdapterExtrasInterface();
+        if(mNfcExtras == null)  {
             return;
         }
         try {
-            Bundle b = ex.open("org.simalliance.openmobileapi.eseterminal", binder);
-            if (b == null) {
+            Bundle b = mNfcExtras.open(PKG_NAME, mBinder);
+            if (!isSuccess(b)) {
+                Log.e(TAG, "Error opening NFC extras");
+                mNfcExtras = null;
                 return;
             }
         } catch (Exception e) {
             Log.e(TAG, "Error while opening nfc adapter", e);
+            mNfcExtras = null;
             return;
         }
-        mNFCAdapaterOpennedSuccesful = true;
     }
 
     @Override
     public void onDestroy() {
-        if (ex != null) {
+        if (mNfcExtras != null) {
             try {
-                Bundle b = ex.close("org.simalliance.openmobileapi.eseterminal", binder);
-                if (b == null) {
+                Bundle b = mNfcExtras.close(PKG_NAME, mBinder);
+                if (!isSuccess(b)) {
                     Log.e(TAG, "Close SE failed");
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error while closing nfc adapter", e);
             }
         }
-        mNFCAdapaterOpennedSuccesful = false;
         unregisterAdapterStateChangedEvent();
         super.onDestroy();
     }
@@ -89,14 +97,17 @@ public final class eSETerminal extends Service {
     }
 
     private byte[] transmit(byte[] cmd) throws Exception {
-        if (!mNFCAdapaterOpennedSuccesful) {
+        if (!isCardPresent()) {
             throw new IllegalStateException("Open SE failed");
         }
-        Bundle b = ex.transceive("org.simalliance.openmobileapi.eseterminal", cmd);
-        if (b == null) {
+        Log.d(TAG, "> " + ByteArrayConverter.byteArrayToHexString(cmd));
+        Bundle b = mNfcExtras.transceive(PKG_NAME, cmd);
+        if (!isSuccess(b)) {
             throw new IOException ("Exchange APDU failed");
         }
-        return b.getByteArray("out");
+        byte[] response = b.getByteArray("out");
+        Log.d(TAG, "< " + ByteArrayConverter.byteArrayToHexString(response));
+        return response;
     }
 
     private void registerAdapterStateChangedEvent() {
@@ -132,13 +143,20 @@ public final class eSETerminal extends Service {
         }
     }
 
+    private boolean isSuccess(Bundle b) {
+        return b != null && b.getInt("e") == 0;
+    }
+
+    private boolean isCardPresent() {
+        return mNfcExtras != null;
+    }
     /**
      * The Terminal service interface implementation.
      */
     final class TerminalServiceImplementation extends ITerminalService.Stub {
         @Override
         public String getType() {
-            return eSETerminal.getType();
+            return ESE_TERMINAL;
         }
 
 
@@ -148,45 +166,58 @@ public final class eSETerminal extends Service {
                 byte p2,
                 SmartcardError error) throws RemoteException {
             try {
-                if (!mNFCAdapaterOpennedSuccesful) {
+                if (!isCardPresent()) {
                     throw new IllegalStateException("Open SE failed");
                 }
-                byte[] manageChannelCommand = new byte[]{
-                        0x00, 0x70, 0x00, 0x00, 0x01
-                };
-                byte[] rsp = eSETerminal.this.transmit(manageChannelCommand);
-                if ((rsp.length == 2) && ((rsp[0] == (byte) 0x68) && (rsp[1] == (byte) 0x81))) {
-                    throw new NoSuchElementException("Logical channels not supported");
+                CommandApdu manageChannelCommand = new CommandApdu(
+                        ISO7816.CLA_INTERINDUSTRY,
+                        ISO7816.INS_MANAGE_CHANNEL,
+                        (byte) 0x00,
+                        (byte) 0x00,
+                        (byte) 0x01);
+                ResponseApdu resp = new ResponseApdu(
+                        eSETerminal.this.transmit(manageChannelCommand.toByteArray()));
+                if (resp.getSwValue() != ISO7816.SW_NO_FURTHER_QUALIFICATION) {
+                    switch (resp.getSwValue()) {
+                        case ISO7816.SW_LOGICAL_CHANNEL_NOT_SUPPORTED:
+                            throw new NoSuchElementException("Logical channels not supported");
+                        case ISO7816.SW_FUNC_NOT_SUPPORTED:
+                            throw new NoSuchElementException("no free channel available");
+                        default:
+                            throw new NoSuchElementException("Error sending manage channel open: "
+                                    + ByteArrayConverter.byteArrayToHexString(resp.getSw()));
+                    }
                 }
-                if (rsp.length == 2 && (rsp[0] == (byte) 0x6A && rsp[1] == (byte) 0x81)) {
-                    throw new NoSuchElementException("no free channel available");
-                }
-                if (rsp.length != 3) {
+
+                if (resp.getData().length != 1) {
                     throw new NoSuchElementException("unsupported MANAGE CHANNEL response data");
                 }
-                int channelNumber = rsp[0] & 0xFF;
+                int channelNumber = resp.getData()[0] & 0xFF;
                 if (channelNumber == 0 || channelNumber > 19) {
                     throw new NoSuchElementException("invalid logical channel number returned");
                 }
 
                 byte[] selectResponse = null;
                 if (aid != null) {
-                    byte[] selectCommand = new byte[aid.length + 6];
-                    selectCommand[0] = (byte) channelNumber;
-                    if (channelNumber > 3) {
-                        selectCommand[0] |= 0x40;
+                    byte cla = ISO7816.CLA_INTERINDUSTRY;
+                    if (channelNumber < 4) {
+                        cla |= channelNumber;
+                    } else {
+                        cla |= (0x40 | (channelNumber - 4));
                     }
-                    selectCommand[1] = (byte) 0xA4;
-                    selectCommand[2] = 0x04;
-                    selectCommand[3] = p2;
-                    selectCommand[4] = (byte) aid.length;
-                    System.arraycopy(aid, 0, selectCommand, 5, aid.length);
+                    CommandApdu selectCommand = new CommandApdu(
+                            cla,
+                            ISO7816.INS_SELECT,
+                            (byte) 0x04,
+                            p2,
+                            aid,
+                            (byte) 0x00);
                     try {
-                        selectResponse = eSETerminal.this.transmit(selectCommand);
-                        int length = selectResponse.length;
-                        if (!(selectResponse[length - 2] == 0x90 && selectResponse[length - 1] == 0x00)
-                                && !(selectResponse[length - 2] == 0x62)
-                                && !(selectResponse[length - 2] == 0x63)) {
+                        selectResponse = eSETerminal.this.transmit(selectCommand.toByteArray());
+                        resp = new ResponseApdu(selectResponse);
+                        if (resp.getSwValue() != ISO7816.SW_NO_FURTHER_QUALIFICATION
+                                && resp.getSw1Value() != 0x62
+                                && resp.getSw1Value() != 0x63) {
                             throw new NoSuchElementException("Select command failed");
                         }
                     } catch (Exception e) {
@@ -197,6 +228,7 @@ public final class eSETerminal extends Service {
 
                 return new OpenLogicalChannelResponse(channelNumber, selectResponse);
             } catch (Exception e) {
+                Log.e(TAG, "Error during internalOpenLogicalChannel", e);
                 error.set(e);
                 return null;
             }
@@ -206,20 +238,19 @@ public final class eSETerminal extends Service {
         public void internalCloseLogicalChannel(int channelNumber, SmartcardError error)
                 throws RemoteException {
             try {
-                if (!mNFCAdapaterOpennedSuccesful) {
+                if (!isCardPresent()) {
                     throw new IOException("open SE failed");
                 }
                 if (channelNumber > 0) {
-                    byte cla = (byte) channelNumber;
-                    if (channelNumber > 3) {
-                        cla |= 0x40;
-                    }
-                    byte[] manageChannelClose = new byte[]{
-                            cla, 0x70, (byte) 0x80, (byte) channelNumber
-                    };
-                    eSETerminal.this.transmit(manageChannelClose);
+                    CommandApdu manageChannelClose = new CommandApdu(
+                            ISO7816.CLA_INTERINDUSTRY,
+                            ISO7816.INS_MANAGE_CHANNEL,
+                            (byte) 0x80,
+                            (byte) channelNumber);
+                    eSETerminal.this.transmit(manageChannelClose.toByteArray());
                 }
             } catch (Exception e) {
+                Log.e(TAG, "Error during internalCloseLogicalChannel", e);
                 error.set(e);
             }
         }
@@ -230,6 +261,7 @@ public final class eSETerminal extends Service {
                 return eSETerminal.this.transmit(command);
             } catch (Exception e) {
                 error.set(e);
+                Log.e(TAG, "Error during internalTransmit", e);
                 return null;
             }
         }
@@ -241,12 +273,7 @@ public final class eSETerminal extends Service {
 
         @Override
         public boolean isCardPresent() throws RemoteException {
-            NfcAdapter adapter =  NfcAdapter.getDefaultAdapter(eSETerminal.this);
-            if(adapter == null) {
-                Log.e(TAG, "Cannot get NFC Default Adapter");
-                return false;
-            }
-            return adapter.isEnabled();
+            return eSETerminal.this.isCardPresent();
         }
 
         @Override
