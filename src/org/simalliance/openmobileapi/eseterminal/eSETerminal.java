@@ -170,7 +170,7 @@ public final class eSETerminal extends Service {
     }
 
     private boolean isCardPresent() {
-        if (mNfcExtras != null) {
+        if (mNfcExtras == null) {
             // Try to initialize it again
             init();
         }
