@@ -114,6 +114,24 @@ public final class eSETerminal extends Service {
         return response;
     }
 
+    private byte[] protocolTransmit(byte[] cmd) throws Exception {
+        CommandApdu cmdApdu = new CommandApdu(cmd);
+        byte[] response = transmit(cmd);
+        ResponseApdu responseApdu = new ResponseApdu(response);
+        if (responseApdu.getSw1Value() == 0x61) {
+            CommandApdu getResponseCmd = new CommandApdu(
+                    ISO7816.CLA_INTERINDUSTRY,
+                    ISO7816.INS_GET_RESPONSE,
+                    (byte) 0x00,
+                    (byte) 0x00,
+                    (byte) responseApdu.getSw2Value());
+            response = transmit(getResponseCmd.toByteArray());
+        } else if (responseApdu.getSw1Value() == 0x6C) {
+            cmdApdu = cmdApdu.cloneWithLe(responseApdu.getSw2Value());
+            response = transmit(cmdApdu.toByteArray());
+        }
+        return response;
+    }
     private void registerAdapterStateChangedEvent() {
         Log.v(TAG, "register ADAPTER_STATE_CHANGED event");
 
@@ -180,7 +198,25 @@ public final class eSETerminal extends Service {
                         (byte) 0x00,
                         (byte) 0x01);
                 ResponseApdu resp = new ResponseApdu(
-                        eSETerminal.this.transmit(manageChannelCommand.toByteArray()));
+                        protocolTransmit(manageChannelCommand.toByteArray()));
+                // [START] Workaround for eSE in SMDK7580
+                if (resp.getSwValue() == ISO7816.SW_LOGICAL_CHANNEL_NOT_SUPPORTED) {
+                    // Select ISD and try again
+                    CommandApdu selectIsd = new CommandApdu(
+                            ISO7816.CLA_INTERINDUSTRY,
+                            ISO7816.INS_SELECT,
+                            (byte) 0x04,
+                            (byte) 0x00,
+                            (byte) 0x00);
+                    resp = new ResponseApdu(
+                            eSETerminal.this.transmit(selectIsd.toByteArray()));
+                    if (resp.getSwValue() != ISO7816.SW_NO_FURTHER_QUALIFICATION) {
+                        throw new NoSuchElementException("Logical channels not supported");
+                    }
+                    resp = new ResponseApdu(
+                            eSETerminal.this.transmit(manageChannelCommand.toByteArray()));
+                }
+                // [END] Workaround for eSE in SMDK7580
                 if (resp.getSwValue() != ISO7816.SW_NO_FURTHER_QUALIFICATION) {
                     switch (resp.getSwValue()) {
                         case ISO7816.SW_LOGICAL_CHANNEL_NOT_SUPPORTED:
@@ -217,7 +253,7 @@ public final class eSETerminal extends Service {
                             aid,
                             (byte) 0x00);
                     try {
-                        selectResponse = eSETerminal.this.transmit(selectCommand.toByteArray());
+                        selectResponse = protocolTransmit(selectCommand.toByteArray());
                         resp = new ResponseApdu(selectResponse);
                         if (resp.getSwValue() != ISO7816.SW_NO_FURTHER_QUALIFICATION
                                 && resp.getSw1Value() != 0x62
@@ -255,7 +291,7 @@ public final class eSETerminal extends Service {
                             ISO7816.INS_MANAGE_CHANNEL,
                             (byte) 0x80,
                             (byte) channelNumber);
-                    eSETerminal.this.transmit(manageChannelClose.toByteArray());
+                    protocolTransmit(manageChannelClose.toByteArray());
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error during internalCloseLogicalChannel", e);
@@ -266,7 +302,7 @@ public final class eSETerminal extends Service {
         @Override
         public byte[] internalTransmit(byte[] command, SmartcardError error) throws RemoteException {
             try {
-                return eSETerminal.this.transmit(command);
+                return protocolTransmit(command);
             } catch (Exception e) {
                 error.set(e);
                 Log.e(TAG, "Error during internalTransmit", e);
