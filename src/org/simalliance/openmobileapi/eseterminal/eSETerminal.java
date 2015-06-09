@@ -222,15 +222,7 @@ public final class eSETerminal extends Service {
                 }
                 // [END] Workaround for eSE in SMDK7580
                 if (resp.getSwValue() != ISO7816.SW_NO_FURTHER_QUALIFICATION) {
-                    switch (resp.getSwValue()) {
-                        case ISO7816.SW_LOGICAL_CHANNEL_NOT_SUPPORTED:
-                            throw new NoSuchElementException("Logical channels not supported");
-                        case ISO7816.SW_FUNC_NOT_SUPPORTED:
-                            throw new NoSuchElementException("no free channel available");
-                        default:
-                            throw new NoSuchElementException("Error sending manage channel open: "
-                                    + ByteArrayConverter.byteArrayToHexString(resp.getSw()));
-                    }
+                    return null;
                 }
 
                 if (resp.getData().length != 1) {
