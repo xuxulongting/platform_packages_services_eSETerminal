@@ -48,8 +48,6 @@ public final class eSETerminal extends Service {
 
     private static final String TAG = "eSETerminal";
 
-    public static final String ESE_TERMINAL = "eSE";
-
     private static final String ACTION_ESE_STATE_CHANGED = "org.simalliance.openmobileapi.action.ESE_STATE_CHANGED";
     private static final String PKG_NAME = "org.simalliance.openmobileapi.eseterminal";
 
@@ -113,10 +111,6 @@ public final class eSETerminal extends Service {
         }
         unregisterAdapterStateChangedEvent();
         super.onDestroy();
-    }
-
-    public static String getType() {
-        return ESE_TERMINAL;
     }
 
     private byte[] transmit(byte[] cmd) throws Exception {
@@ -219,11 +213,6 @@ public final class eSETerminal extends Service {
      * The Terminal service interface implementation.
      */
     final class TerminalServiceImplementation extends ITerminalService.Stub {
-        @Override
-        public String getType() {
-            return ESE_TERMINAL;
-        }
-
 
         @Override
         public OpenLogicalChannelResponse internalOpenLogicalChannel(
